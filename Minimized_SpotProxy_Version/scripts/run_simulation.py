@@ -1,3 +1,5 @@
+# THIS FILE IS NOT USED IN THIS REPO, IT WAS USED DURING THE CREATION OF THE MINIMAL VERISON AND SERVES AS A CONTROL SIMULATION FILE!
+
 from random import random
 from django.db.models import F
 from tqdm import tqdm
