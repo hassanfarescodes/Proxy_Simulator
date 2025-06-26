@@ -10,6 +10,7 @@ from assignments.models import Client, Proxy, Assignment
 from scripts.Censor import OptimalCensor
 from scripts.config_basic import BIRTH_PERIOD, SIMULATION_DURATION
 from scripts.simulation_utils import request_new_proxy_new_client
+from django.utils.timezone import now
 
 
 REJUVENATION_INTERVAL = 10
@@ -59,6 +60,7 @@ def run_simulation(
         # Block some proxies
         for proxy in censor.run(step):
             proxy.is_blocked = True
+            proxy.blocked_at = now()
             proxy.save()
             # mark all clients of this proxy as knowing it's blocked
             client_ids = Assignment.objects.filter(proxy=proxy).values_list('client_id', flat=True)
@@ -84,16 +86,24 @@ def run_simulation(
         total_users = Client.objects.count()
         blocked_users = Client.objects.filter(is_censor_agent=True).count()
         user_ratio.append((total_users - blocked_users) / total_users if total_users else 0)
+    
+    lifetimes = []
+    for proxy in Proxy.objects.all():
+        if proxy.blocked_at:
+            lifetime = (proxy.blocked_at - proxy.created_at).total_seconds()
+            lifetimes.append(lifetime)
+
+    avg_lifetime = sum(lifetimes) / len(lifetimes) if lifetimes else 0
+    
 
     # THis will save the results to a csv file
     os.makedirs("../results/", exist_ok=True)
     with open("../results/minimal_results.csv", "w") as f:
-        f.write("nonblocked_proxy_ratio,nonblocked_proxy_count,connected_user_ratio\n")
+        f.write("nonblocked_proxy_ratio,nonblocked_proxy_count,connected_user_ratio,avg_proxy_lifetime\n")
         for p_ratio, p_count, u_ratio in zip(proxy_ratio, proxy_count, user_ratio):
-            f.write(f"{p_ratio},{p_count},{u_ratio}\n")
+            f.write(f"{p_ratio},{p_count},{u_ratio},{avg_lifetime}\n")
 
     print("Simulation complete!")
 
 if __name__ == "__main__":
     run_simulation()
-
