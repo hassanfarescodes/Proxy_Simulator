@@ -10,7 +10,7 @@ $ >> python manage.py migrate
  
 ## Run
 
-$ >> PYTHONPATH=. python scripts/run_simulation_minimal.py --distributor strict *OR* kind
+$ >> PYTHONPATH=. python scripts/run_simulation_minimal.py --distributor strict **OR** kind
 
 Make sure you are in "Proxy_Simulator/Minimized_SpotProxy_Version" when you run all of the above commands!
 
