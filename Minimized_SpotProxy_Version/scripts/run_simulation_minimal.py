@@ -4,11 +4,13 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
+import argparse
 from random import random
 from django.db.models import F
 from assignments.models import Client, Proxy, Assignment
 from scripts.Censor import OptimalCensor
 from scripts.config_basic import BIRTH_PERIOD, SIMULATION_DURATION
+from scripts.config_basic import KIND_PROFILE, STRICT_PROFILE
 from scripts.simulation_utils import request_new_proxy_new_client
 from django.utils.timezone import now
 
@@ -28,11 +30,11 @@ def create_new_proxy(last_ip):
     Proxy.objects.create(ip=new_ip, is_test=True)
     return new_ip
 
-def create_new_client(step, censor_chance=CENSOR_RATIO):
+def create_new_client(step, censor_chance=CENSOR_RATIO, distributor_profile=None):
     client_ip = f"10.0.0.{Client.objects.count()+1}"
     is_censor_agent = random() < censor_chance
     client = Client.objects.create(ip=client_ip, is_censor_agent=is_censor_agent)
-    request_new_proxy_new_client(client, step)
+    request_new_proxy_new_client(client, step, distributor_profile)
     return client
 
 def rejuvinate(step):
@@ -44,7 +46,8 @@ def rejuvinate(step):
 def run_simulation(
     duration=BIRTH_PERIOD + SIMULATION_DURATION,
     rejuvenation_interval=REJUVENATION_INTERVAL,
-    censor_ratio=CENSOR_RATIO
+    censor_ratio=CENSOR_RATIO,
+    distributor_profile=STRICT_PROFILE,
 ):
     Proxy.objects.all().delete()
     Client.objects.all().delete()
@@ -73,7 +76,7 @@ def run_simulation(
             rejuvinate(step)
 
         # Create new client
-        create_new_client(step, censor_chance=censor_ratio)
+        create_new_client(step, censor_chance=censor_ratio, distributor_profile=distributor_profile)
 
         # Add new proxy every 5 steps
         if step % 5 == 0:
@@ -105,5 +108,15 @@ def run_simulation(
 
     print("Simulation complete!")
 
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--distributor", choices=["kind", "strict"], default="strict", help="Choose distributor profile")
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    run_simulation()
+    args = parse_args()
+    distributor_profile = KIND_PROFILE if args.distributor == "kind" else STRICT_PROFILE
+    print(f"Running with distributor profile: {args.distributor}")
+    run_simulation(distributor_profile=distributor_profile)
+

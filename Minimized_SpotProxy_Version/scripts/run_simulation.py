@@ -13,6 +13,7 @@ from assignments.models import (
 )
 from scripts.Censor import *
 from scripts.config_basic import *
+from scripts.config_basic import KIND_PROFILE, STRICT_PROFILE
 from scripts.simulation_utils import request_new_proxy, request_new_proxy_new_client
 from time import time, sleep
 import os
@@ -21,6 +22,7 @@ def run_simulation(
     censoring_agent_ratio,
     censoring_agent_ratio_birth_period,
     rejuvination_interval,
+    distributor_profile,
 ):
     if censor_type == "OPTIMAL":
         print("optimal censor")
@@ -103,7 +105,7 @@ def run_simulation(
             )
         if step % rejuvination_interval == 0:
             rejuvinate(step)
-        request_new_proxy(proposing_clients=blocked_clients, right_now=step)
+        request_new_proxy(proposing_clients=blocked_clients, right_now=step, distributor_profile=distributor_profile)
         if step % NEW_PROXY_INTERVAL == 0:
             for _ in range(NEW_PROXY_COUNT):
                 last_created_proxy_ip = create_new_proxy(last_created_proxy_ip)
@@ -168,7 +170,7 @@ def create_new_client(
         censor.agents.append(cl)
     else:
         cl = Client.objects.create(ip=ip, creation_time=step)
-    request_new_proxy_new_client(cl, step)
+    request_new_proxy_new_client(cl, step, distributor_profile)
     return client_id
 def run(*args):
     CENSOR_TYPE = ["OPTIMAL", "AGGRESIVE"]  
@@ -179,44 +181,46 @@ def run(*args):
     REJUVINATION_INTERVAL = [1]  
     CENSORING_AGENTS_TO_ALL_CLIENTS = [0.05]  
     CENSORING_AGENTS_TO_ALL_CLIENTS_BIRTH_PERIOD_ratio = 0.4
-    for censoring_agent_ratio in CENSORING_AGENTS_TO_ALL_CLIENTS:
-        for censor_type in CENSOR_TYPE:
-            for rejuvination_interval in REJUVINATION_INTERVAL:
-                run_simulation(
+    for distributor_name, distributor_profile in DISTRIBUTOR_PROFILES.items():
+        for censoring_agent_ratio in CENSORING_AGENTS_TO_ALL_CLIENTS:
+            for censor_type in CENSOR_TYPE:
+                for rejuvination_interval in REJUVINATION_INTERVAL:
+                    run_simulation(
                     censor_type,
                     censoring_agent_ratio,
                     censoring_agent_ratio
                     * CENSORING_AGENTS_TO_ALL_CLIENTS_BIRTH_PERIOD_ratio,
                     rejuvination_interval,
-                )
-                nonblockedproxyratio = list(
-                    ChartNonBlockedProxyRatio.objects.all().values_list(
-                        "value", flat=True
+                    distributor_profile,
                     )
-                )
-                nonblockedproxycount = list(
-                    ChartNonBlockedProxyCount.objects.all().values_list(
-                        "value", flat=True
-                    )
-                )
-                connecteduserratio = list(
-                    ChartConnectedUsersRatio.objects.all().values_list(
-                        "value", flat=True
-                    )
-                )
-                with open(
-                    f"../results/results_{censor_type}_rej{rejuvination_interval}_cens{censoring_agent_ratio}.csv",
-                    "w",
-                ) as f:
-                    f.write(
-                        "nonblocked_proxy_ratio,nonblocked_proxy_count,connected_user_ratio\n"
-                    )
-                    for i in range(len(nonblockedproxycount)):
-                        f.write(
-                            f"{nonblockedproxyratio[i]},{nonblockedproxycount[i]},{connecteduserratio[i]}\n"
+                    nonblockedproxyratio = list(
+                        ChartNonBlockedProxyRatio.objects.all().values_list(
+                            "value", flat=True
                         )
-                print("done")
-                os.system("python3 controller/manage.py flush --no-input")
-                sleep(3)
-                print("ready to go")
+                    )
+                    nonblockedproxycount = list(
+                        ChartNonBlockedProxyCount.objects.all().values_list(
+                            "value", flat=True
+                        )
+                    )
+                    connecteduserratio = list(
+                        ChartConnectedUsersRatio.objects.all().values_list(
+                            "value", flat=True
+                        )
+                    )
+                    with open(
+                        f"../results/results_{censor_type}_rej{rejuvination_interval}_cens{censoring_agent_ratio}.csv",
+                        "w",
+                    ) as f:
+                        f.write(
+                            "nonblocked_proxy_ratio,nonblocked_proxy_count,connected_user_ratio\n"
+                        )
+                        for i in range(len(nonblockedproxycount)):
+                            f.write(
+                                f"{nonblockedproxyratio[i]},{nonblockedproxycount[i]},{connecteduserratio[i]}\n"
+                            )
+                    print("done")
+                    os.system("python3 controller/manage.py flush --no-input")
+                    sleep(3)
+                    print("ready to go")
 
