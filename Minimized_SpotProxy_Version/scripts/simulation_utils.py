@@ -8,7 +8,6 @@ def score_proxy_for_client(proxy, client, distributor_profile):
     alpha4 = distributor_profile.get("alpha4", 1)
     alpha5 = distributor_profile.get("alpha5", 1)
 
-    # Example input features (replace with real logic if needed)
     proxy_usage = Assignment.objects.filter(proxy=proxy).count()
     client_requests = client.known_blocked_proxies
     location_penalty = 1  # Placeholder if you want IP-distance logic
