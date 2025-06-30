@@ -17,3 +17,16 @@ STRICT_PROFILE = {
     "alpha4": 3.0,
     "alpha5": 2.0,
 }
+
+STATIC_PROFILES = {
+    "random": {
+        "type": "random",
+        "proxies_per_client": 2
+    },
+    "broadcast": {
+        "type": "broadcast"
+    },
+    "fixed": {
+        "type": "fixed"
+    }
+}
