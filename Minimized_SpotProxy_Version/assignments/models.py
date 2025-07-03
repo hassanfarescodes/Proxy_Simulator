@@ -18,6 +18,8 @@ class Client(models.Model):
     known_blocked_proxies = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    credits = models.FloatField(default=0.0)
+
 
     def __str__(self):
         return self.ip
