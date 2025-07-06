@@ -1,5 +1,5 @@
 import random
-from assignments.models import Proxy
+from assignments.models import Proxy, Assignment
 
 class OptimalCensor:
     def __init__(self):
@@ -17,3 +17,15 @@ class AggresiveCensor(OptimalCensor):
             return random.sample(proxies, k=min(2, len(proxies)))
         return []
 
+class TargetedCensor:
+    def run(self, step):
+        active_proxies = Proxy.objects.filter(is_active=True, is_blocked=False)
+
+        proxy_scores = []
+        for proxy in active_proxies:
+            honest_users = Assignment.objects.filter(proxy=proxy, client__is_censor_agent=False).count()
+            proxy_scores.append((honest_users, proxy))
+
+        proxy_scores.sort(key=lambda x: (x[0], x[1].id), reverse=True)
+        to_block = [p for _, p in proxy_scores[:max(1, len(proxy_scores) // 10)]]
+        return to_block
