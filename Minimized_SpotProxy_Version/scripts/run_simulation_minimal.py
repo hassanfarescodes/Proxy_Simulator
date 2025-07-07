@@ -15,7 +15,7 @@ from scripts.config_basic import (
     BIRTH_PERIOD, SIMULATION_DURATION,
     KIND_PROFILE, STRICT_PROFILE, STATIC_PROFILES
 )
-from scripts.simulation_utils import request_new_proxy_new_client
+from scripts.simulation_utils import request_new_proxy_new_client, update_client_credits
 from django.utils.timezone import now
 
 REJUVENATION_INTERVAL = 10
@@ -89,6 +89,7 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
         total_users = Client.objects.count()
         blocked_users = Client.objects.filter(is_censor_agent=True).count()
         user_ratio.append((total_users - blocked_users) / total_users if total_users else 0)
+        update_client_credits()
 
     lifetimes = [
         (proxy.blocked_at - proxy.created_at).total_seconds()
@@ -187,10 +188,11 @@ if __name__ == "__main__":
         profile = STRICT_PROFILE
     else:
         profile = STATIC_PROFILES[args.distributor]
+    
+    print(f"Running with distributor profile: {args.distributor}")
 
     if args.mode == "static":
         run_static_simulation(profile, censor_type=args.censor)
     else:
         run_simulation(distributor_profile=profile, censor_type=args.censor)
 
-    print(f"Running with distributor profile: {args.distributor}")
