@@ -18,7 +18,7 @@ Make sure you are in "Proxy_Simulator/Minimized_SpotProxy_Version" when you run 
 ## Scoring Equations:
 
 <p>
-Score(P, C) = α<sub>1</sub> · U − α<sub>2</sub> · R − α<sub>3</sub> · B − α<sub>5</sub> · L
+RbridgeScore(P, C) = α<sub>1</sub> · U − α<sub>2</sub> · R − α<sub>3</sub> · B − α<sub>5</sub> · L
 </p>
 
 Where:
