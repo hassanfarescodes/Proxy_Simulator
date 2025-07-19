@@ -20,7 +20,8 @@ from django.utils.timezone import now
 
 REJUVENATION_INTERVAL = 10
 CENSOR_RATIO = 0.1
-
+client_wait_start = {}
+client_wait_times = []
 def get_migration_proxies_ip(old_ip):
     nums = list(map(int, old_ip.split(".")))
     nums[-1] = (nums[-1] + 1) % 256
@@ -33,11 +34,11 @@ def create_new_proxy(last_ip):
     Proxy.objects.create(ip=new_ip, is_test=True)
     return new_ip
 
-def create_new_client(step, censor_chance=CENSOR_RATIO, distributor_profile=None):
+def create_new_client(step, client_wait_start, client_wait_times, censor_chance=CENSOR_RATIO, distributor_profile=None):
     client_ip = f"10.0.0.{Client.objects.count()+1}"
     is_censor_agent = random.random() < censor_chance
     client = Client.objects.create(ip=client_ip, is_censor_agent=is_censor_agent)
-    request_new_proxy_new_client(client, step, distributor_profile)
+    request_new_proxy_new_client(client, step, distributor_profile, client_wait_start, client_wait_times)
     return client
 
 def rejuvinate(step):
@@ -70,14 +71,17 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
             Client.objects.filter(id__in=client_ids).update(
                 known_blocked_proxies=F('known_blocked_proxies')+1
             )
-            for client in Client.objects.all():
-                if client.known_blocked_proxies > 0:
-                    request_new_proxy_new_client(client, step, distributor_profile)
+            for client_id in client_ids:
+                if client_id not in client_wait_start:
+                    client_wait_start[client_id] = step 
+            for client_id in client_ids:
+                client = Client.objects.get(id=client_id)
+                request_new_proxy_new_client(client, step, distributor_profile, client_wait_start, client_wait_times)
 
         if step % rejuvenation_interval == 0 and step > 0:
             rejuvinate(step)
 
-        create_new_client(step, censor_chance=censor_ratio, distributor_profile=distributor_profile)
+        create_new_client(step, client_wait_start, client_wait_times, censor_chance=censor_ratio, distributor_profile=distributor_profile)
 
         if step % 5 == 0:
             last_ip = create_new_proxy(last_ip)
@@ -134,8 +138,7 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
     Assignment.objects.all().delete()
 
     proxies = [Proxy.objects.create(ip=f"10.0.0.{i}") for i in range(TOTAL_PROXIES)]
-    clients = [Client.objects.create(ip=f"192.168.0.{i}", is_censor_agent=random.random() < CENSOR_RATIO)
-               for i in range(TOTAL_CLIENTS)]
+    clients = [Client.objects.create(ip=f"192.168.0.{i}", is_censor_agent=random.random() < CENSOR_RATIO) for i in range(TOTAL_CLIENTS)]
 
     assign_proxies_static(clients, proxies, distributor_profile)
 
@@ -148,9 +151,11 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
             proxy.blocked_at = now()
             proxy.save()
             client_ids = Assignment.objects.filter(proxy=proxy).values_list('client_id', flat=True)
-            Client.objects.filter(id__in=client_ids).update(
-                known_blocked_proxies=F('known_blocked_proxies') + 1
-            )
+            Client.objects.filter(id__in=client_ids).update(known_blocked_proxies=F('known_blocked_proxies') + 1)
+            for client_id in client_ids:
+                if client_id not in client_wait_start:
+                    client_wait_start[client_id] = step
+
 
         total = Proxy.objects.count()
         blocked = Proxy.objects.filter(is_blocked=True).count()
@@ -195,4 +200,6 @@ if __name__ == "__main__":
         run_static_simulation(profile, censor_type=args.censor)
     else:
         run_simulation(distributor_profile=profile, censor_type=args.censor)
+    avg_wait_time = sum(client_wait_times) / len(client_wait_times) if client_wait_times else 0
+    print(f"\n- Average Wait Time: {round(avg_wait_time, 2)}")
 

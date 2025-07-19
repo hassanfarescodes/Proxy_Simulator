@@ -6,6 +6,7 @@ RED = "\033[91m"
 
 RESET = "\033[0m"
 
+
 def score_proxy_for_client(proxy, client, distributor_profile):
     # Pull weight factors
     alpha1 = distributor_profile.get("alpha1", 1)
@@ -32,7 +33,7 @@ def score_proxy_for_client(proxy, client, distributor_profile):
 CREDIT_COST = 1.0
 
 
-def request_new_proxy_new_client(client, step, distributor_profile):
+def request_new_proxy_new_client(client, step, distributor_profile, client_wait_start=None, client_wait_times=None):
     has_any_assignment = Assignment.objects.filter(client=client).exists()
     if not has_any_assignment or client.credits >= CREDIT_COST:
         active_proxies = Proxy.objects.filter(is_active=True, is_blocked=False)
@@ -64,6 +65,13 @@ def request_new_proxy_new_client(client, step, distributor_profile):
             if has_any_assignment:
                 client.credits -= CREDIT_COST
             client.save()
+                
+
+            if client_wait_start is not None and client_wait_times is not None:
+                if client.id in client_wait_start:
+                    wait_duration = step - client_wait_start[client.id]
+                    client_wait_times.append(wait_duration)
+                    del client_wait_start[client.id]
 
 def update_client_credits():
     for client in Client.objects.all():
