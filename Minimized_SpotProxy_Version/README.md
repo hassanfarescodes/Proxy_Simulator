@@ -41,3 +41,4 @@ Where:
 - D = proxy diversity (unique/total)
 - B = known blocked proxy rate
 - w1–w4 = tunable weights
+

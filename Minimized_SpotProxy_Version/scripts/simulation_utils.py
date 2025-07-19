@@ -3,7 +3,6 @@ from scripts.logger import rblog
 import logging
 
 RED = "\033[91m"
-
 RESET = "\033[0m"
 
 
@@ -30,7 +29,7 @@ def score_proxy_for_client(proxy, client, distributor_profile):
     return score
 
 
-CREDIT_COST = 1.0
+CREDIT_COST = 1.00
 
 
 def request_new_proxy_new_client(client, step, distributor_profile, client_wait_start=None, client_wait_times=None):
