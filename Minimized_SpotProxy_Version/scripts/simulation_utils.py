@@ -2,6 +2,10 @@ from assignments.models import Client, Proxy, Assignment
 from scripts.logger import rblog
 import logging
 
+RED = "\033[91m"
+
+RESET = "\033[0m"
+
 def score_proxy_for_client(proxy, client, distributor_profile):
     # Pull weight factors
     alpha1 = distributor_profile.get("alpha1", 1)
@@ -13,7 +17,7 @@ def score_proxy_for_client(proxy, client, distributor_profile):
     # Example input features (replace with real logic if needed)
     proxy_usage = Assignment.objects.filter(proxy=proxy).count()
     client_requests = client.known_blocked_proxies
-    location_penalty = 1  # Placeholder if you want IP-distance logic
+    location_penalty = 1 
 
     # Scoring formula: Higher score = better proxy for this client
     score = (
@@ -45,12 +49,13 @@ def request_new_proxy_new_client(client, step, distributor_profile):
                 best_proxy = proxy
 
         if best_proxy:
-            # ZigZag sensor hook: check for reassignments
+            # check for reassignments
             previous_assignments = Assignment.objects.filter(client=client, proxy=best_proxy)
             if previous_assignments.exists():
-                print(f"[ZigZagSensor] ALERT: Client {client.ip} reassigned to Proxy {best_proxy.ip} at step {step}")
+                print(f"{RED}[ZigZagSensor] ALERT: Client {client.ip} reassigned to Proxy {best_proxy.ip} at step {step}{RESET}")
+                return
 
-            # Log recent proxy usage by other clients
+            # log recent proxy usage by other clients
             recent_assignments = Assignment.objects.filter(proxy=best_proxy).order_by('-created_at')[:5]
             if recent_assignments.count() > 1:
                 print(f"[ZigZagSensor] WARNING: Proxy {best_proxy.ip} reused across multiple clients at step {step}")
