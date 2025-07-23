@@ -53,6 +53,11 @@ def request_new_proxy_new_client(client, step, distributor_profile, client_wait_
             previous_assignments = Assignment.objects.filter(client=client, proxy=best_proxy)
             if previous_assignments.exists():
                 print(f"{RED}[ZigZagSensor] ALERT: Client {client.ip} reassigned to Proxy {best_proxy.ip} at step {step}{RESET}")
+                client.known_blocked_proxies += 1
+                client.credits = max(0.0, client.credits - 0.5)
+                client.save()
+                if client_wait_start is not None:
+                    client_wait_start[client.id] = step
                 return
 
             # log recent proxy usage by other clients

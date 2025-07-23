@@ -17,6 +17,7 @@ from scripts.config_basic import (
 )
 from scripts.simulation_utils import request_new_proxy_new_client, update_client_credits
 from django.utils.timezone import now
+from datetime import timedelta
 
 REJUVENATION_INTERVAL = 10
 CENSOR_RATIO = 0.1
@@ -65,7 +66,7 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
     for step in range(duration):
         for proxy in censor.run(step):
             proxy.is_blocked = True
-            proxy.blocked_at = now()
+            proxy.blocked_at = proxy.created_at + timedelta(seconds=step)
             proxy.save()
             client_ids = Assignment.objects.filter(proxy=proxy).values_list('client_id', flat=True)
             Client.objects.filter(id__in=client_ids).update(
@@ -148,7 +149,7 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
     for step in range(SIMULATION_STEPS):
         for proxy in censor.run(step):
             proxy.is_blocked = True
-            proxy.blocked_at = now()
+            proxy.blocked_at = proxy.created_at + timedelta(seconds=step)
             proxy.save()
             client_ids = Assignment.objects.filter(proxy=proxy).values_list('client_id', flat=True)
             Client.objects.filter(id__in=client_ids).update(known_blocked_proxies=F('known_blocked_proxies') + 1)
@@ -200,6 +201,7 @@ if __name__ == "__main__":
         run_static_simulation(profile, censor_type=args.censor)
     else:
         run_simulation(distributor_profile=profile, censor_type=args.censor)
+
     avg_wait_time = sum(client_wait_times) / len(client_wait_times) if client_wait_times else 0
     print(f"\n- Average Wait Time: {round(avg_wait_time, 2)}")
 
