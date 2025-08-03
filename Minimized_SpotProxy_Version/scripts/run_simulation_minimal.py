@@ -61,7 +61,14 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
     Proxy.objects.create(ip=last_ip, is_test=True)
 
     proxy_ratio, proxy_count, user_ratio = [], [], []
-    censor = TargetedCensor() if censor_type == "targeted" else OptimalCensor()
+    if censor_type == "targeted":
+        censor = TargetedCensor()
+    elif censor_type == "snowflake":
+        from scripts.Censor import SnowflakeCensor
+        censor = SnowflakeCensor()
+    else:
+        censor = OptimalCensor()
+
 
     for step in range(duration):
         for proxy in censor.run(step):
@@ -84,8 +91,14 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
 
         create_new_client(step, client_wait_start, client_wait_times, censor_chance=censor_ratio, distributor_profile=distributor_profile)
 
-        if step % 5 == 0:
+        if step % 3 == 0:
             last_ip = create_new_proxy(last_ip)
+
+        if step % 5 == 0:
+            old_proxies = Proxy.objects.filter(is_test=True)[:3]
+            for p in old_proxies:
+                p.is_active = False
+                p.save()
 
         total_proxies = Proxy.objects.count()
         blocked_proxies = Proxy.objects.filter(is_blocked=True).count()
@@ -182,7 +195,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--distributor", choices=["kind", "strict", "broadcast", "random", "fixed"], default="strict")
     parser.add_argument("--mode", choices=["dynamic", "static"], default="dynamic")
-    parser.add_argument("--censor", choices=["optimal", "targeted"], default="optimal")
+    parser.add_argument("--censor", choices=["optimal", "targeted", "snowflake"], default="optimal")
+
     return parser.parse_args()
 
 if __name__ == "__main__":
