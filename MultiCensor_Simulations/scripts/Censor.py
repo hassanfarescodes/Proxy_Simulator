@@ -1,5 +1,6 @@
 import random
 from assignments.models import Proxy, Assignment
+from scripts.config_basic import SNOWFLAKE_BLOCK_INTERVAL, SNOWFLAKE_BLOCK_FRACTION
 
 class OptimalCensor:
     def __init__(self):
@@ -31,12 +32,27 @@ class TargetedCensor:
         return to_block
 
 class SnowflakeCensor:
+    def __init__(self,
+                 block_interval: int = SNOWFLAKE_BLOCK_INTERVAL,
+                 block_fraction: float = SNOWFLAKE_BLOCK_FRACTION):
+        self.block_interval = block_interval
+        self.block_fraction = block_fraction
+
     def run(self, step):
-        if step % 10 == 0:
-            proxies = list(Proxy.objects.filter(is_active=True, is_blocked=False))
-            blocked_count = int(len(proxies) * 0.05)
-            return random.sample(proxies, k=min(blocked_count, len(proxies)))
-        return []
+        if step % self.block_interval != 0:
+            return []
+
+        volunteers = list(
+            Proxy.objects.filter(
+                is_test=True,
+                is_active=True,
+                is_blocked=False
+            )
+        )
+        if not volunteers:
+            return []
+        k = max(1, int(len(volunteers) * self.block_fraction))
+        return random.sample(volunteers, k)
 
 class MultiCensor:
     def __init__(self, censor_map):
