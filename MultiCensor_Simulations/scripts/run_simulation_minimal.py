@@ -36,16 +36,21 @@ def create_new_proxy(last_ip):
 
 def create_new_client(step, client_wait_start, client_wait_times, censor_chance=CENSOR_RATIO, distributor_profile=None):
     client_ip = f"10.0.0.{Client.objects.count()+1}"
-    is_censor_agent = random.random() < censor_chance
+    censor_group = random.choice(['A', 'B'])
 
-    if is_censor_agent:
-        censor_tag = random.choice(['A', 'B'])
-    else:
-        censor_tag = None
+    is_censor_agent = (random.random() < censor_chance)
 
-    client = Client.objects.create(ip=client_ip, is_censor_agent=is_censor_agent, censor_tag=censor_tag)
+    client = Client.objects.create(
+        ip=client_ip,
+        is_censor_agent=is_censor_agent,
+        censor_group=censor_group,
+    )
 
-    request_new_proxy_new_client(client, step, distributor_profile, client_wait_start, client_wait_times)
+    if not is_censor_agent:
+        request_new_proxy_new_client(
+            client, step, distributor_profile, client_wait_start, client_wait_times
+        )
+
     return client
 
 def rejuvinate(step):
@@ -67,6 +72,7 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
     Proxy.objects.create(ip=last_ip, is_test=True)
 
     proxy_ratio, proxy_count, user_ratio = [], [], []
+    connected_A_log, connected_B_log = [], []
     censor_map = {
         'A': AggresiveCensor(),
         'B': TargetedCensor(),
@@ -112,18 +118,34 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
         blocked_users = Client.objects.filter(is_censor_agent=True).count()
         user_ratio.append((total_users - blocked_users) / total_users if total_users else 0)
         update_client_credits()
+        def connected_ratio_for(group_label):
+            users = Client.objects.filter(is_censor_agent=False, censor_group=group_label)
+            total = users.count()
+            if total == 0:
+                return 0.0
+            connected = sum(
+                Assignment.objects.filter(client=u, proxy__is_blocked=False).exists()
+                for u in users
+            )
+            return connected / total
+
+        connected_A_log.append(connected_ratio_for('A'))
+        connected_B_log.append(connected_ratio_for('B'))
+
 
     lifetimes = [
-        (proxy.blocked_at - proxy.created_at).total_seconds()
-        for proxy in Proxy.objects.all() if proxy.blocked_at
+    (p.blocked_at - p.created_at).total_seconds()
+    for p in Proxy.objects.all() if p.blocked_at
     ]
     avg_lifetime = sum(lifetimes) / len(lifetimes) if lifetimes else 0
 
     os.makedirs("../results/", exist_ok=True)
     with open("../results/minimal_results.csv", "w") as f:
-        f.write("nonblocked_proxy_ratio,nonblocked_proxy_count,connected_user_ratio,avg_proxy_lifetime\n")
-        for p_ratio, p_count, u_ratio in zip(proxy_ratio, proxy_count, user_ratio):
-            f.write(f"{p_ratio},{p_count},{u_ratio},{avg_lifetime}\n")
+        f.write("step,nonblocked_proxy_ratio,proxy_count,connected_overall,connected_A,connected_B,avg_proxy_lifetime\n")
+        for step, (p_ratio, p_count, u_ratio, a_ratio, b_ratio) in enumerate(
+            zip(proxy_ratio, proxy_count, user_ratio, connected_A_log, connected_B_log)
+        ):
+            f.write(f"{step},{p_ratio},{p_count},{u_ratio},{a_ratio},{b_ratio},{avg_lifetime}\n")
 
     print("Simulation complete!")
 
@@ -189,9 +211,11 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
 
     os.makedirs("../results/", exist_ok=True)
     with open("../results/static_results.csv", "w") as f:
-        f.write("proxy_ratio,connected_user_ratio\n")
-        for pr, ur in zip(proxy_ratio_log, user_ratio_log):
-            f.write(f"{pr},{ur}\n")
+        f.write("step,proxy_ratio,connected_user_ratio,connected_A,connected_B\n")
+    for step, (pr, ur, a_ratio, b_ratio) in enumerate(
+        zip(proxy_ratio_log, user_ratio_log, connected_A_log, connected_B_log)
+    ):
+        f.write(f"{step},{pr},{ur},{a_ratio},{b_ratio}\n")
 
     print("Static simulation complete.")
 
