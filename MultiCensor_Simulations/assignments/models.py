@@ -18,7 +18,12 @@ class Client(models.Model):
     known_blocked_proxies = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    censor_tag = models.CharField(max_length=1, null=True, blank=True)
+    censor_group = models.CharField(
+        max_length=1,
+        choices=[('A', 'A'), ('B', 'B')],
+        default='A',
+        db_index=True,
+    )
     credits = models.FloatField(default=0.0)
 
 
