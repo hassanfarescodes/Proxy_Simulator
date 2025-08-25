@@ -36,7 +36,10 @@ def create_new_proxy(last_ip):
 
 def create_new_client(step, client_wait_start, client_wait_times, censor_chance=CENSOR_RATIO, distributor_profile=None):
     client_ip = f"10.0.0.{Client.objects.count()+1}"
-    censor_group = random.choice(['A', 'B'])
+
+    a_all = Client.objects.filter(censor_group='A').count()
+    b_all = Client.objects.filter(censor_group='B').count()
+    censor_group = 'A' if a_all <= b_all else 'B'
 
     is_censor_agent = (random.random() < censor_chance)
 
@@ -59,6 +62,17 @@ def rejuvinate(step):
         proxy.is_blocked = False
         proxy.blocked_at = None
         proxy.save()
+
+def connected_overall_ratio():
+    users = Client.objects.filter(is_censor_agent=False)
+    total = users.count()
+    if total == 0:
+        return 0.0
+    connected = sum(
+        Assignment.objects.filter(client=u, proxy__is_blocked=False).exists()
+        for u in users
+    )
+    return connected / total
 
 def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
                    rejuvenation_interval=REJUVENATION_INTERVAL,
@@ -116,7 +130,8 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
         proxy_count.append(total_proxies)
         total_users = Client.objects.count()
         blocked_users = Client.objects.filter(is_censor_agent=True).count()
-        user_ratio.append((total_users - blocked_users) / total_users if total_users else 0)
+
+        user_ratio.append(connected_overall_ratio())
         update_client_credits()
         def connected_ratio_for(group_label):
             users = Client.objects.filter(is_censor_agent=False, censor_group=group_label)
