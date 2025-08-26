@@ -12,7 +12,7 @@ from django.db.models import F
 from scripts.Censor import AggresiveCensor, TargetedCensor, MultiCensor
 from scripts.config_basic import (
     BIRTH_PERIOD, SIMULATION_DURATION,
-    KIND_PROFILE, STRICT_PROFILE, STATIC_PROFILES
+    KIND_PROFILE, STRICT_PROFILE, STATIC_PROFILES, COLLATERAL_DAMAGE_PROB
 )
 from scripts.simulation_utils import request_new_proxy_new_client, update_client_credits
 from django.utils.timezone import now
@@ -22,6 +22,10 @@ REJUVENATION_INTERVAL = 10
 CENSOR_RATIO = 0.1
 client_wait_start = {}
 client_wait_times = []
+
+collateral_proxies = 0
+
+
 def get_migration_proxies_ip(old_ip):
     nums = list(map(int, old_ip.split(".")))
     nums[-1] = (nums[-1] + 1) % 256
@@ -81,6 +85,7 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
     Proxy.objects.all().delete()
     Client.objects.all().delete()
     Assignment.objects.all().delete()
+    global collateral_proxies
 
     last_ip = "10.0.0.0"
     Proxy.objects.create(ip=last_ip, is_test=True)
@@ -110,6 +115,16 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
                 client = Client.objects.get(id=client_id)
                 request_new_proxy_new_client(client, step, distributor_profile, client_wait_start, client_wait_times)
 
+        if random.random() < COLLATERAL_DAMAGE_PROB:
+            innocent_candidates = Proxy.objects.filter(is_active=True, is_blocked=False)
+            if innocent_candidates.exists():
+                innocent = random.choice(list(innocent_candidates))
+                innocent.is_blocked = True
+                innocent.blocked_at = innocent.created_at + timedelta(seconds=step)
+                innocent.save()
+                collateral_proxies += 1
+                print(f"[CollateralDamage] Innocent Proxy {innocent.ip} blocked at step {step}")
+    
         if step % rejuvenation_interval == 0 and step > 0:
             rejuvinate(step)
 
@@ -187,6 +202,7 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
     TOTAL_CLIENTS = 100
     TOTAL_PROXIES = 10
     SIMULATION_STEPS = 30
+    global collateral_proxies
 
     Proxy.objects.all().delete()
     Client.objects.all().delete()
@@ -210,6 +226,16 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
             for client_id in client_ids:
                 if client_id not in client_wait_start:
                     client_wait_start[client_id] = step
+
+        if random.random() < COLLATERAL_DAMAGE_PROB:
+            innocent_candidates = Proxy.objects.filter(is_active=True, is_blocked=False)
+            if innocent_candidates.exists():
+                innocent = random.choice(list(innocent_candidates))
+                innocent.is_blocked = True
+                innocent.blocked_at = innocent.created_at + timedelta(seconds=step)
+                innocent.save()
+                collateral_proxies += 1
+                print(f"[CollateralDamage] Innocent Proxy {innocent.ip} blocked at step {step}")
 
 
         total = Proxy.objects.count()
@@ -261,4 +287,5 @@ if __name__ == "__main__":
 
     avg_wait_time = sum(client_wait_times) / len(client_wait_times) if client_wait_times else 0
     print(f"\n- Average Wait Time: {round(avg_wait_time, 2)}")
+    print(f"\n- Collateral Innocent Proxies: {collateral_proxies}")
 
