@@ -12,7 +12,7 @@ from django.db.models import F
 from scripts.Censor import AggresiveCensor, TargetedCensor, MultiCensor
 from scripts.config_basic import (
     BIRTH_PERIOD, SIMULATION_DURATION,
-    KIND_PROFILE, STRICT_PROFILE, STATIC_PROFILES, COLLATERAL_DAMAGE_PROB
+    KIND_PROFILE, STRICT_PROFILE, STATIC_PROFILES
 )
 from scripts.simulation_utils import request_new_proxy_new_client, update_client_credits
 from django.utils.timezone import now
@@ -81,7 +81,7 @@ def connected_overall_ratio():
 def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
                    rejuvenation_interval=REJUVENATION_INTERVAL,
                    censor_ratio=CENSOR_RATIO,
-                   distributor_profile=STRICT_PROFILE, censor_type="optimal"):
+                   distributor_profile=STRICT_PROFILE, censor_type="optimal", collat_prob=0.08):
     Proxy.objects.all().delete()
     Client.objects.all().delete()
     Assignment.objects.all().delete()
@@ -115,7 +115,7 @@ def run_simulation(duration=BIRTH_PERIOD + SIMULATION_DURATION,
                 client = Client.objects.get(id=client_id)
                 request_new_proxy_new_client(client, step, distributor_profile, client_wait_start, client_wait_times)
 
-        if random.random() < COLLATERAL_DAMAGE_PROB:
+        if random.random() < collat_prob:
             innocent_candidates = Proxy.objects.filter(is_active=True, is_blocked=False)
             if innocent_candidates.exists():
                 innocent = random.choice(list(innocent_candidates))
@@ -227,7 +227,7 @@ def run_static_simulation(distributor_profile, censor_type="optimal"):
                 if client_id not in client_wait_start:
                     client_wait_start[client_id] = step
 
-        if random.random() < COLLATERAL_DAMAGE_PROB:
+        if random.random() < collat_prob:
             innocent_candidates = Proxy.objects.filter(is_active=True, is_blocked=False)
             if innocent_candidates.exists():
                 innocent = random.choice(list(innocent_candidates))
@@ -271,19 +271,30 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
+    print(f"Running with distributor profile: {args.distributor}")
+
     if args.distributor == "kind":
         profile = KIND_PROFILE
+        collat_prob = 0.05
     elif args.distributor == "strict":
         profile = STRICT_PROFILE
-    else:
-        profile = STATIC_PROFILES[args.distributor]
+        collat_prob = 0.10
+    elif args.distributor == "random":
+        profile = STATIC_PROFILES["random"]
+        collat_prob = 0.12
+    elif args.distributor == "broadcast":
+        profile = STATIC_PROFILES["broadcast"]
+        collat_prob = 0.15
+    elif args.distributor == "fixed":
+        profile = STATIC_PROFILES["fixed"]
+        collat_prob = 0.08
     
     print(f"Running with distributor profile: {args.distributor}")
 
     if args.mode == "static":
-        run_static_simulation(profile, censor_type=args.censor)
+        run_static_simulation(profile, censor_type=args.censor, collat_prob=collat_prob)
     else:
-        run_simulation(distributor_profile=profile, censor_type=args.censor)
+        run_simulation(distributor_profile=profile, censor_type=args.censor, collat_prob=collat_prob)
 
     avg_wait_time = sum(client_wait_times) / len(client_wait_times) if client_wait_times else 0
     print(f"\n- Average Wait Time: {round(avg_wait_time, 2)}")
